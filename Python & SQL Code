@@ -1,0 +1,173 @@
+**STEP 1: Download & Load the Dataset**
+
+First, download the dataset from Kaggle: 📦 Telco Customer Churn Dataset
+
+Save the CSV file as telco_customer_churn.csv.
+
+**STEP 2: Python – Data Cleaning & Exploration**
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load dataset
+df = pd.read_csv('telco_customer_churn.csv')
+
+# Quick look
+print(df.head())
+print(df.info())
+
+**STEP 3: Data Cleaning**
+
+# Replace blank strings with NaN and drop missing values
+df.replace(" ", np.nan, inplace=True)
+df.dropna(inplace=True)
+
+# Convert 'TotalCharges' to numeric
+df['TotalCharges'] = pd.to_numeric(df['TotalCharges'])
+
+# Convert 'SeniorCitizen' to Yes/No
+df['SeniorCitizen'] = df['SeniorCitizen'].replace({1: 'Yes', 0: 'No'})
+
+# Ensure consistency in column names
+df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+
+# Convert 'churn' to binary
+df['churn_flag'] = df['churn'].map({'Yes': 1, 'No': 0})
+
+**STEP 4: Exploratory Data Analysis (Visualizations)**
+
+# 1. Churn by contract type
+plt.figure(figsize=(8,5))
+sns.countplot(data=df, x='contract', hue='churn')
+plt.title('Churn by Contract Type')
+plt.show()
+
+# 2. Monthly charges distribution
+plt.figure(figsize=(8,5))
+sns.boxplot(data=df, x='churn', y='monthlycharges')
+plt.title('Monthly Charges vs Churn')
+plt.show()
+
+# 3. Correlation heatmap
+plt.figure(figsize=(10,6))
+sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm')
+plt.title('Correlation Between Numeric Features')
+plt.show()
+
+# 4. Tenure vs Churn
+plt.figure(figsize=(8,5))
+sns.histplot(data=df, x='tenure', hue='churn', multiple='stack', bins=30)
+plt.title('Tenure Distribution by Churn')
+plt.show()
+
+**STEP 5: Save Cleaned Data to CSV (for SQLite)**
+
+# Save the cleaned dataset
+df.to_csv('telco_cleaned.csv', index=False)
+
+ **STEP 6: Upload CSV to SQLite**
+
+-- Step 1: Create the table structure
+CREATE TABLE telco (
+    customerid TEXT,
+    gender TEXT,
+    seniorcitizen TEXT,
+    partner TEXT,
+    dependents TEXT,
+    tenure INTEGER,
+    phoneservice TEXT,
+    multiplelines TEXT,
+    internetservice TEXT,
+    onlinesecurity TEXT,
+    onlinebackup TEXT,
+    deviceprotection TEXT,
+    techsupport TEXT,
+    streamingtv TEXT,
+    streamingmovies TEXT,
+    contract TEXT,
+    paperlessbilling TEXT,
+    paymentmethod TEXT,
+    monthlycharges REAL,
+    totalcharges REAL,
+    churn TEXT,
+    churn_flag INTEGER
+);
+**STEP 7: SQL Queries for Insight**
+
+1. Churn Rate Overview: This will give us the overall churn rate, an essential KPI for any telecom provider.
+
+SELECT 
+    COUNT(*) AS total_customers,
+    SUM(churn_flag) AS total_churned,
+    ROUND(100.0 * SUM(churn_flag) / COUNT(*), 2) AS churn_rate_percentage
+FROM telco;
+
+2. Churn Rate by Contract Type: Helps determine which contract types are most vulnerable to churn (monthly contracts usually have higher churn).
+
+SELECT 
+    contract,
+    COUNT(*) AS total_customers,
+    SUM(churn_flag) AS churned_customers,
+    ROUND(100.0 * SUM(churn_flag) / COUNT(*), 2) AS churn_rate_percentage
+FROM telco
+GROUP BY contract
+ORDER BY churn_rate_percentage DESC;
+
+3. Average Monthly & Total Charges by Churn Status: Compares customer value between churned and retained groups—critical for identifying high-value customers at risk.
+
+SELECT 
+    churn,
+    ROUND(AVG(monthlycharges), 2) AS avg_monthlycharges,
+    ROUND(AVG(totalcharges), 2) AS avg_totalcharges
+FROM telco
+GROUP BY churn;
+
+4. Top 5 Internet Services with Highest Churn Rates: Evaluates which internet service types may need attention in terms of retention strategies.
+SELECT 
+    internetservice,
+    COUNT(*) AS total,
+    SUM(churn_flag) AS churned,
+    ROUND(100.0 * SUM(churn_flag) / COUNT(*), 2) AS churn_rate
+FROM telco
+GROUP BY internetservice
+ORDER BY churn_rate DESC
+LIMIT 5;
+
+5. Churn by Payment Method: Identifies if customers using certain payment methods (like electronic check) are more likely to churn.
+
+SELECT 
+    paymentmethod,
+    COUNT(*) AS total,
+    SUM(churn_flag) AS churned,
+    ROUND(100.0 * SUM(churn_flag) / COUNT(*), 2) AS churn_rate
+FROM telco
+GROUP BY paymentmethod
+ORDER BY churn_rate DESC;
+
+6. Tenure Grouping and Churn Rate: Allows you to understand customer lifecycle stages and when they are most at risk of leaving.
+
+SELECT
+    CASE 
+        WHEN tenure BETWEEN 0 AND 12 THEN '0-1 year'
+        WHEN tenure BETWEEN 13 AND 24 THEN '1-2 years'
+        WHEN tenure BETWEEN 25 AND 48 THEN '2-4 years'
+        ELSE '4+ years'
+    END AS tenure_group,
+    COUNT(*) AS total_customers,
+    SUM(churn_flag) AS churned,
+    ROUND(100.0 * SUM(churn_flag) / COUNT(*), 2) AS churn_rate
+FROM telco
+GROUP BY tenure_group
+ORDER BY churn_rate DESC;
+
+7. Senior Citizens and Churn: Analyzes how age-related demographics (senior vs. non-senior) affect churn.
+
+SELECT 
+    seniorcitizen,
+    COUNT(*) AS total_customers,
+    SUM(churn_flag) AS churned_customers,
+    ROUND(100.0 * SUM(churn_flag) / COUNT(*), 2) AS churn_rate
+FROM telco
+GROUP BY seniorcitizen;
